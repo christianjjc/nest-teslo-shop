@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { PaginationDto } from '../common/dtos/pagination.dto';
+import { validate as isUUID } from 'uuid';
 
 @Injectable()
 export class ProductsService {
@@ -21,7 +22,7 @@ export class ProductsService {
       await this.productRepository.save(product);
       return product;
     } catch (error) {
-      this.handleExceptions(error);
+      this.handleDBExceptions(error);
     }
   }
 
@@ -33,16 +34,41 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string) {
-    const product = await this.productRepository.findOneBy({ id });
+  async findOne(term: string) {
+    let product: Product;
+
+    if (isUUID(term)) {
+      product = await this.productRepository.findOneBy({ id: term });
+    } else {
+      // product = await this.productRepository.findOneBy({ slug: term }); //ya no usamos esta línea.
+      const queryBuilder = this.productRepository.createQueryBuilder(); // se reemplaza con esta.
+      product = await queryBuilder
+        .where('UPPER(title) =:title or slug =:slug', {
+          title: term.toUpperCase(),
+          slug: term.toLowerCase(),
+        })
+        .getOne();
+    }
+    // const product = await this.productRepository.findOneBy({ id });
     if (!product) {
-      throw new NotFoundException(`Product with id ${id} not Found`);
+      throw new NotFoundException(`Product with '${term}' not Found`);
     }
     return product;
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
+  async update(id: string, updateProductDto: UpdateProductDto) {
+    const product = await this.productRepository.preload({
+      id,
+      ...updateProductDto,
+    });
+    if (!product) throw new NotFoundException(`Product with id: '${id}' not Found`);
+
+    try {
+      await this.productRepository.save(product);
+      return product;
+    } catch (error) {
+      this.handleDBExceptions(error);
+    }
   }
 
   async remove(id: string) {
@@ -50,7 +76,7 @@ export class ProductsService {
     await this.productRepository.remove(product);
   }
 
-  private handleExceptions(error: any) {
+  private handleDBExceptions(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexpected error!, check server logs.');
