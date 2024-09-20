@@ -24,3 +24,9 @@ docker-compose up -d
 ```
 npm run start:dev
 ```
+
+7. Ejecutar el SEED para inicializar la BD con datos de ejemplo
+
+```
+http://localhost:3000/api/seed
+```
