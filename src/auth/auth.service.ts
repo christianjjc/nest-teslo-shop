@@ -56,14 +56,21 @@ export class AuthService {
     };
   }
 
-  private handleDBExceptions(error: any): never {
-    if (error.code === '23505') throw new BadRequestException(error.detail);
-    this.logger.error(error);
-    throw new InternalServerErrorException('Unexpected error!, check server logs.');
+  async checkAuthStatus(user: User) {
+    return {
+      ...user,
+      token: this.getJwt({ id: user.id }),
+    };
   }
 
   private getJwt(payload: JwtPayload) {
     const token = this.jwtService.sign(payload);
     return token;
+  }
+
+  private handleDBExceptions(error: any): never {
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+    this.logger.error(error);
+    throw new InternalServerErrorException('Unexpected error!, check server logs.');
   }
 }
