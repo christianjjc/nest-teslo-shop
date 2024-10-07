@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { User } from './entities/user.entity';
 import { CreateUserDto, LoginUserDto } from './dto';
 import * as bcrypt from 'bcrypt'; //patron Adaptador
+import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +14,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
   ) {}
 
   async createUser(createUserDto: CreateUserDto) {
@@ -21,11 +24,10 @@ export class AuthService {
         ...userData,
         password: bcrypt.hashSync(password, 10),
       });
-      const { id, fullName, roles } = await this.userRepository.save(user);
+      await this.userRepository.save(user);
       return {
-        id,
-        fullName,
-        roles,
+        ...user,
+        token: this.getJwt({ id: user.id }),
       };
     } catch (error) {
       this.handleDBExceptions(error);
@@ -39,6 +41,7 @@ export class AuthService {
       select: {
         email: true,
         password: true,
+        id: true,
       },
     });
     if (!user) {
@@ -47,12 +50,20 @@ export class AuthService {
     if (!bcrypt.compareSync(password, user.password)) {
       throw new UnauthorizedException('email/password not valid!');
     }
-    return user;
+    return {
+      ...user,
+      token: this.getJwt({ id: user.id }),
+    };
   }
 
   private handleDBExceptions(error: any): never {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);
     throw new InternalServerErrorException('Unexpected error!, check server logs.');
+  }
+
+  private getJwt(payload: JwtPayload) {
+    const token = this.jwtService.sign(payload);
+    return token;
   }
 }
