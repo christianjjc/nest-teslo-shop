@@ -1,15 +1,40 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 import { Type } from 'class-transformer';
 import { IsOptional, IsPositive, Min } from 'class-validator';
 
 export class PaginationDto {
-  @IsPositive()
+  @ApiProperty({
+    default: 10,
+    description: 'How many rows do you need',
+  })
   @IsOptional()
-  @Type(() => Number) //transformar a numero -- enableImplicitConversions=true
+  @IsPositive()
+  @Type(() => Number) // enableImplicitConversions: true
   limit?: number;
 
-  //@IsPositive()
+  @ApiProperty({
+    default: 0,
+    description: 'How many rows do you want to skip',
+  })
   @IsOptional()
   @Min(0)
-  @Type(() => Number) //transformar a numero
+  @Type(() => Number) // enableImplicitConversions: true
   offset?: number;
 }
+
+// import { Type } from 'class-transformer';
+// import { IsOptional, IsPositive, Min } from 'class-validator';
+
+// export class PaginationDto {
+//   @IsPositive()
+//   @IsOptional()
+//   @Type(() => Number) //transformar a numero -- enableImplicitConversions=true
+//   limit?: number;
+
+//   //@IsPositive()
+//   @IsOptional()
+//   @Min(0)
+//   @Type(() => Number) //transformar a numero
+//   offset?: number;
+// }
