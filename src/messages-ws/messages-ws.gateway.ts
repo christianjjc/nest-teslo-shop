@@ -3,6 +3,8 @@ import { MessagesWsService } from './messages-ws.service';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { NewMessageDto } from './dto/new-message.dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from '../auth/interfaces';
 
 enum WsEvents {
   CLIENTS_UPDATED = 'clients-updated',
@@ -16,14 +18,26 @@ enum WsEvents {
 export class MessagesWsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() wss: Server;
 
-  constructor(private readonly messagesWsService: MessagesWsService) {}
+  constructor(
+    //
+    private readonly messagesWsService: MessagesWsService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   private readonly logger = new Logger('Messages-WsGateway');
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const token = client.handshake.headers.authentication as string;
-    console.log({ token });
-    this.messagesWsService.registerClient(client);
+    let payload: JwtPayload;
+
+    try {
+      payload = this.jwtService.verify(token);
+      await this.messagesWsService.registerClient(client, payload.id);
+    } catch (error) {
+      client.disconnect();
+      return;
+    }
+    console.log({ payload });
 
     // client.join('SALA_COMUNICADOS'); //! *** EMITE A SALA ESPECÍFICA ***
 
@@ -55,7 +69,7 @@ export class MessagesWsGateway implements OnGatewayConnection, OnGatewayDisconne
 
     //! EMITE A TODOS LOS CLIENTES
     this.wss.emit(WsEvents.MESSAGE_FROM_SERVER, {
-      fullName: 'Soy Yo',
+      fullName: this.messagesWsService.getUserFullName(client.id),
       message: payload.message || 'no message',
     });
 
